@@ -1,0 +1,47 @@
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: custom-ingress-class
+  annotations:
+    ingressclass.kubernetes.io/is-default-class: "true"
+spec:
+  controller: k8s.io/ingress-nginx
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: custom-ingress-controller
+  namespace: ingress-nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: custom-ingress-controller
+  template:
+    metadata:
+      labels:
+        app: custom-ingress-controller
+    spec:
+      containers:
+      - name: custom-ingress-controller
+        image: k8s.gcr.io/ingress-nginx/controller:v0.48.1
+        args:
+          - /nginx-ingress-controller
+          - --configmap=$(POD_NAMESPACE)/nginx-configuration
+          - --publish-service=$(POD_NAMESPACE)/ingress-nginx
+          - --annotations-prefix=nginx.ingress.kubernetes.io
+          - --ingress-class=custom-ingress-class
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        ports:
+        - name: http
+          containerPort: 80
+        - name: https
+          containerPort: 443
