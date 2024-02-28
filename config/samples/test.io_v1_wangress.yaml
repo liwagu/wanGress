@@ -1,0 +1,12 @@
+apiVersion: test.io.liwa.com/v1
+kind: WanGress
+metadata:
+  labels:
+    app.kubernetes.io/name: wangress
+    app.kubernetes.io/instance: wangress-sample
+    app.kubernetes.io/part-of: wangress
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: wangress
+  name: wangress-sample
+spec:
+  # TODO(user): Add fields here

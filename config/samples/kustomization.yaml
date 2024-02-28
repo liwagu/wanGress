@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- test.io_v1_wangress.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

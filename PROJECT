@@ -7,4 +7,14 @@ layout:
 - go.kubebuilder.io/v4
 projectName: wangress
 repo: wanGress
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: liwa.com
+  group: test.io
+  kind: WanGress
+  path: wanGress/api/v1
+  version: v1
 version: "3"

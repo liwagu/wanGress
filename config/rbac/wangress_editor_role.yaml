@@ -1,0 +1,31 @@
+# permissions for end users to edit wangresses.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: wangress-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: wangress
+    app.kubernetes.io/part-of: wangress
+    app.kubernetes.io/managed-by: kustomize
+  name: wangress-editor-role
+rules:
+- apiGroups:
+  - test.io.liwa.com
+  resources:
+  - wangresses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - test.io.liwa.com
+  resources:
+  - wangresses/status
+  verbs:
+  - get
