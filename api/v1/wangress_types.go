@@ -28,14 +28,44 @@ type WanGressSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of WanGress. Edit wangress_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// Routes are the list of routes this resource manages
+	Routes []Route `json:"routes,omitempty"`
+	// TLS contains the TLS configuration for this WanGress
+	TLS []TLS `json:"tls,omitempty"`
+}
+
+// Route defines an individual route
+type Route struct {
+	// Path is the path to match against incoming requests
+	// Must be a valid HTTP path.
+	Path string `json:"path"`
+	// Services are the backend services to forward the matched requests
+	Services []Service `json:"services"`
+}
+
+// Service defines a backend service
+type Service struct {
+	// Name is the name of the service
+	Name string `json:"name"`
+	// Port is the service port to forward to
+	Port int `json:"port"`
+}
+
+// TLS defines the TLS configuration
+type TLS struct {
+	// SecretName is the name of the secret that contains the TLS private key and certificate
+	SecretName string `json:"secretName"`
+	// Hosts are the domain names this TLS configuration applies to
+	Hosts []string `json:"hosts"`
 }
 
 // WanGressStatus defines the observed state of WanGress
 type WanGressStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// Conditions represent the latest available observations of an object's state
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true
