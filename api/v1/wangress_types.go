@@ -28,38 +28,32 @@ type WanGressSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Routes are the list of routes this resource manages
+	// Hosts is a list of host names that the Ingress should match.
+	Hosts []string `json:"hosts,omitempty"`
+
+	// TLS configuration for the Ingress.
+	TLS []WangressTLS `json:"tls,omitempty"`
+
+	// 添加路由规则
 	Routes []Route `json:"routes,omitempty"`
-	// TLS contains the TLS configuration for this WanGress
-	TLS []TLS `json:"tls,omitempty"`
 }
 
-// Route defines an individual route
 type Route struct {
-	// Path is the path to match against incoming requests
-	// Must be a valid HTTP path.
-	Path string `json:"path"`
-	// Services are the backend services to forward the matched requests
+	Path     string    `json:"path"`
 	Services []Service `json:"services"`
 }
 
-// Service defines a backend service
 type Service struct {
-	// Name is the name of the service
 	Name string `json:"name"`
-	// Port is the service port to forward to
-	Port int `json:"port"`
+	Port int32  `json:"port"`
 }
 
-// TLS defines the TLS configuration
-type TLS struct {
-	// SecretName is the name of the secret that contains the TLS private key and certificate
-	SecretName string `json:"secretName"`
-	// Hosts are the domain names this TLS configuration applies to
-	Hosts []string `json:"hosts"`
+// WangressTLS defines the TLS configuration for a host.
+type WangressTLS struct {
+	Hosts      []string `json:"hosts"`
+	SecretName string   `json:"secretName"`
 }
 
-// WanGressStatus defines the observed state of WanGress
 type WanGressStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file

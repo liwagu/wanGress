@@ -18,19 +18,18 @@ package controller
 
 import (
 	"context"
-	"fmt"
+	testiov1 "wanGress/api/v1"
 
+	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	testiov1 "wanGress/api/v1"
 )
 
 // WanGressReconciler reconciles a WanGress object
 type WanGressReconciler struct {
 	client.Client
+	Log    logr.Logger
 	Scheme *runtime.Scheme
 }
 
@@ -48,11 +47,67 @@ type WanGressReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.3/pkg/reconcile
 func (r *WanGressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	log := r.Log.WithValues("wangress", req.NamespacedName)
 
-	// TODO(user): your logic here
-	fmt.Println(req)
+	// 获取WanGress实例
+	var wangress testiov1.WanGress
+	if err := r.Get(ctx, req.NamespacedName, &wangress); err != nil {
+		log.Error(err, "无法获取WanGress")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	// 检查WanGress是否被标记为删除
+	if wangress.DeletionTimestamp != nil {
+		// 处理删除逻辑，例如清理Envoy配置
+		if err := r.cleanupEnvoyConfig(&wangress); err != nil {
+			log.Error(err, "清理Envoy配置失败")
+			return ctrl.Result{}, err
+		}
+		// 更新状态并退出
+		return ctrl.Result{}, nil
+	}
+
+	// 基于WanGress规格生成Envoy配置
+	envoyConfig, err := generateEnvoyConfig(&wangress)
+	if err != nil {
+		log.Error(err, "无法生成Envoy配置")
+		return ctrl.Result{}, err
+	}
+
+	// 更新Envoy配置
+	if err := updateEnvoyConfig(envoyConfig); err != nil {
+		log.Error(err, "无法更新Envoy配置")
+		return ctrl.Result{}, err
+	}
+
+	// 更新WanGress状态
+	if err := updateWanGressStatus(&wangress); err != nil {
+		log.Error(err, "无法更新WanGress状态")
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
+}
+
+// 生成Envoy配置的函数
+func generateEnvoyConfig(wangress *testiov1.WanGress) (EnvoyConfig, error) {
+	// 根据wangress对象的规格生成Envoy配置
+	// 这里需要根据实际情况实现转换逻辑
+	return EnvoyConfig{}, nil
+}
+
+// 更新Envoy配置的函数
+func updateEnvoyConfig(config EnvoyConfig) error {
+	// 实现与Envoy通信，更新配置的逻辑
+	// 可能涉及到使用xDS API与Envoy进行通信
+	return nil
+}
+
+// 更新WanGress状态的函数
+func updateEnvoyConfig(config EnvoyConfig) error {
+	// 实现与Envoy通信，更新配置的逻辑
+	// 可能涉及到使用xDS API与Envoy进行通信
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
