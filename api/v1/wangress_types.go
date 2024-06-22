@@ -1,4 +1,12 @@
 /*
+ * @Author: liwa guliwa@foxmail.com
+ * @Date: 2024-03-07 17:10:53
+ * @LastEditors: liwa guliwa@foxmail.com
+ * @LastEditTime: 2024-03-21 09:04:42
+ * @FilePath: \wanGress\api\v1\wangress_types.go
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
+/*
 Copyright 2024.
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -39,8 +47,10 @@ type WanGressSpec struct {
 }
 
 type Route struct {
-	Path     string    `json:"path"`
-	Services []Service `json:"services"`
+	Path     string            `json:"path"`
+	Services []Service         `json:"services"`
+	Headers  map[string]string `json:"headers,omitempty"` // 基于请求头的路由
+	Rewrite  *Rewrite          `json:"rewrite,omitempty"` // 路径重写规则
 }
 
 type Service struct {
@@ -48,6 +58,9 @@ type Service struct {
 	Port int32  `json:"port"`
 }
 
+type Rewrite struct {
+	Prefix string `json:"prefix,omitempty"` // 替换路径前缀
+}
 // WangressTLS defines the TLS configuration for a host.
 type WangressTLS struct {
 	Hosts      []string `json:"hosts"`
@@ -55,11 +68,9 @@ type WangressTLS struct {
 }
 
 type WanGressStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Conditions represent the latest available observations of an object's state
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	Phase      string             `json:"phase,omitempty"`
+	Message    string             `json:"message,omitempty"`
 }
 
 //+kubebuilder:object:root=true
