@@ -3,88 +3,131 @@ package envoy
 import (
 	"context"
 	"fmt"
-	envoy_cluster_v3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
-	envoy_listener_v3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
+	endpoint "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
+	clusterservice "github.com/envoyproxy/go-control-plane/envoy/service/cluster/v3"
+	discoverygrpc "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
+	endpointservice "github.com/envoyproxy/go-control-plane/envoy/service/endpoint/v3"
+	listenerservice "github.com/envoyproxy/go-control-plane/envoy/service/listener/v3"
+	routeservice "github.com/envoyproxy/go-control-plane/envoy/service/route/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
-	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
-	"github.com/envoyproxy/go-control-plane/pkg/server/v3"
-	"google.golang.org/grpc"
 	"log"
 	"net"
+	"time"
+
+	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
+	listener "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
+	route "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
+
+	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
+	"github.com/envoyproxy/go-control-plane/pkg/resource/v3"
+	xds "github.com/envoyproxy/go-control-plane/pkg/server/v3"
+	"google.golang.org/grpc"
 )
 
-const xdsPort = 8080 // 定义xDS服务器的端口
+const (
+	xdsPort = 18000
+)
 
 type XDSClient struct {
-	server server.Server
 	cache  cache.SnapshotCache
+	server xds.Server
 }
 
 func NewXDSClient() *XDSClient {
 	cache := cache.NewSnapshotCache(false, cache.IDHash{}, nil)
-	srv := server.NewServer(context.Background(), cache, nil)
-
+	server := xds.NewServer(context.Background(), cache, nil)
 	return &XDSClient{
-		server: srv,
 		cache:  cache,
+		server: server,
 	}
 }
 
 func (c *XDSClient) Run() {
-	// 启动xDS服务器
 	go func() {
 		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", xdsPort))
 		if err != nil {
-			log.Fatalf("failed to listen on port %d: %v", xdsPort, err)
+			log.Fatalf("failed to listen: %v", err)
 		}
 		grpcServer := grpc.NewServer()
-		server.RegisterServer(grpcServer, c.server)
+
+		// Register all xDS services
+		discoverygrpc.RegisterAggregatedDiscoveryServiceServer(grpcServer, c.server)
+		endpointservice.RegisterEndpointDiscoveryServiceServer(grpcServer, c.server)
+		clusterservice.RegisterClusterDiscoveryServiceServer(grpcServer, c.server)
+		routeservice.RegisterRouteDiscoveryServiceServer(grpcServer, c.server)
+		listenerservice.RegisterListenerDiscoveryServiceServer(grpcServer, c.server)
+
+		log.Printf("xDS server listening on %d", xdsPort)
 		if err := grpcServer.Serve(lis); err != nil {
-			log.Fatalf("failed to serve gRPC server: %v", err)
+			log.Fatalf("failed to serve: %v", err)
 		}
 	}()
 }
 
-func (c *XDSClient) UpdateConfig(listener *envoy_listener_v3.Listener, clusters []*envoy_cluster_v3.Cluster) error {
-	// 创建并应用新的配置快照
-	version := "version_1" // 可以根据需要动态生成版本号
+func (c *XDSClient) UpdateConfig(listeners []*listener.Listener, clusters []*cluster.Cluster, routes []*route.RouteConfiguration, endpoints []*endpoint.ClusterLoadAssignment) error {
+	version := fmt.Sprintf("%d", time.Now().UnixNano())
 
-	snapshot := cache.NewSnapshot(
-		version,
-		nil,                        // endpoints
-		[]types.Resource{listener}, // 使用从generateEnvoyConfig返回的listener
-		clusters,                   // 使用生成的集群配置
-		nil,                        // routes
-		nil,                        // runtimes
-		nil,                        // secrets
+	snapshot, err := cache.NewSnapshot(version,
+		map[resource.Type][]types.Resource{
+			resource.ListenerType: castToResource(listeners),
+			resource.ClusterType:  castToResource(clusters),
+			resource.RouteType:    castToResource(routes),
+			resource.EndpointType: castToResource(endpoints),
+		},
 	)
+	if err != nil {
+		return fmt.Errorf("failed to create snapshot: %v", err)
+	}
 
-	// 应用快照到xDS服务器的缓存中
-	if err := c.cache.SetSnapshot(context.Background(), "default", snapshot); err != nil {
-		return fmt.Errorf("error setting snapshot: %w", err)
+	if err := c.cache.SetSnapshot(context.Background(), "envoy-node", snapshot); err != nil {
+		return fmt.Errorf("failed to set snapshot: %v", err)
 	}
 
 	return nil
 }
 
 func (c *XDSClient) RemoveConfig() error {
-	// 使用空快照来删除配置
-	version := "version_empty"
-
-	snapshot := cache.NewSnapshot(
-		version,
-		nil, // endpoints
-		nil, // listeners
-		nil, // clusters
-		nil, // routes
-		nil, // runtimes
-		nil, // secrets
+	emptySnapshot, err := cache.NewSnapshot("empty",
+		map[resource.Type][]types.Resource{
+			resource.ListenerType: {},
+			resource.ClusterType:  {},
+			resource.RouteType:    {},
+			resource.EndpointType: {},
+		},
 	)
+	if err != nil {
+		return fmt.Errorf("failed to create empty snapshot: %v", err)
+	}
 
-	// 应用空快照到xDS服务器的缓存中
-	if err := c.cache.SetSnapshot(context.Background(), "default", snapshot); err != nil {
-		return fmt.Errorf("error removing snapshot: %w", err)
+	if err := c.cache.SetSnapshot(context.Background(), "envoy-node", emptySnapshot); err != nil {
+		return fmt.Errorf("failed to set empty snapshot: %v", err)
 	}
 
 	return nil
+}
+
+// Helper function to cast slices to []types.Resource
+func castToResource(slice interface{}) []types.Resource {
+	switch s := slice.(type) {
+	case []*listener.Listener:
+		r := make([]types.Resource, len(s))
+		for i, v := range s {
+			r[i] = v
+		}
+		return r
+	case []*cluster.Cluster:
+		r := make([]types.Resource, len(s))
+		for i, v := range s {
+			r[i] = v
+		}
+		return r
+	case []*route.RouteConfiguration:
+		r := make([]types.Resource, len(s))
+		for i, v := range s {
+			r[i] = v
+		}
+		return r
+	default:
+		return nil
+	}
 }
